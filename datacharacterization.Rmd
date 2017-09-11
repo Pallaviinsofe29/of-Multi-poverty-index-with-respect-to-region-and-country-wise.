@@ -1,0 +1,91 @@
+---
+title: "Untitled"
+author: "pallavi"
+date: "11 September 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(caret)
+library(ggplot2)
+library(DMwR)
+library(dummies)
+library(ggplot2)
+library(corrplot)
+library(MASS)
+library(car)
+library(glmnet)
+library(doParallel)
+library(data.table)
+library(ROCR)
+require(e1071)
+library(randomForest)
+```
+
+
+
+```{r cars}
+rm(list = ls(all=TRUE))
+getwd()
+setwd( "C:/Users/Pallavi/Desktop/internship/bank marketing data")
+marketingdata=read.csv("bankdata.csv",sep=";")
+
+
+```
+
+```{r}
+marketingdata[marketingdata=="unknown"]<-NA
+sum(is.na(marketingdata))
+mean(is.na(marketingdata))
+colMeans(is.na(marketingdata)) > .20
+nzv <- nearZeroVar(marketingdata[,!names(marketingdata) %in% c("y")])
+
+table(marketingdata$y)
+marketingdata=knnImputation(marketingdata,k=5,scale = T)
+sum(is.na(marketingdata))
+
+
+```
+
+```{r}
+library(pastecs)
+stat.desc(marketingdata)
+unique(marketingdata, incomparables = FALSE, fromLast = FALSE,
+        nmax = NA,list.len=41188)
+```
+
+
+
+```{r}
+str(marketingdata)
+summary(marketingdata)
+
+head(marketingdata)
+tail(marketingdata)
+dim(marketingdata)
+
+
+```
+
+
+
+```{r}
+library(corrplot)
+Numeric_cols=marketingdata[,-c(2,3,5,4,6,7,8,9,10,15,21)]
+factor_cols=marketingdata[,c(2,3,5,4,6,7,8,9,10,15,21)]
+corrplot(cor(Numeric_cols),method = "number")
+
+```
+
+
+
