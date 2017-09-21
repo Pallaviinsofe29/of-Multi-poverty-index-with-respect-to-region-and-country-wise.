@@ -1,0 +1,190 @@
+---
+title: "DataPreproessing"
+author: "pallavi"
+date: "21 September 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+#load all libraries
+```{r}
+library(caret)
+library(ggplot2)
+library(DMwR)
+library(dummies)
+library(ggplot2)
+library(corrplot)
+library(MASS)
+library(car)
+library(glmnet)
+library(doParallel)
+library(data.table)
+library(ROCR)
+require(e1071)
+library(randomForest)
+```
+
+#set directory and read the data
+
+```{r cars}
+rm(list = ls(all=TRUE))
+getwd()
+setwd( "C:/Users/Pallavi/Desktop/internship/bank marketing data")
+marketingdata=read.csv("bankdata.csv",sep=";",na.strings="unknown")
+
+
+```
+
+#check  for NA values
+```{r}
+marketingdata$age=NULL
+str(marketingdata)
+sum(is.na(marketingdata))
+```
+
+#central Imputation and NearZerovarience
+```{r}
+marketingdata<-centralImputation(marketingdata)
+sum(is.na(marketingdata))
+mean(is.na(marketingdata))
+colMeans(is.na(marketingdata)) > .20
+nzv <- nearZeroVar(marketingdata[,!names(marketingdata) %in% c("y")])
+
+```
+
+
+#Find Unique values
+```{r}
+library(pastecs)
+stat.desc(marketingdata)
+unique(marketingdata, incomparables = FALSE, fromLast = FALSE,
+        nmax = NA,list.len=41188)
+```
+
+#Target variable "y" is changed to 0 and 1
+```{r}
+levels(marketingdata$y)
+marketingdata$y<-as.character(marketingdata$y)
+marketingdata$y[marketingdata$y=="yes"]=1
+marketingdata$y[marketingdata$y=="no" ]=0
+marketingdata$y<-as.factor(marketingdata$y)
+```
+
+#Checking Summary ,Structure,head,tail and dimension
+```{r}
+str(marketingdata)
+summary(marketingdata)
+
+head(marketingdata)
+tail(marketingdata)
+dim(marketingdata)
+
+
+```
+
+
+#Factors are converted to Numerics except target variable
+```{r}
+marketingdata$job=as.numeric(marketingdata$job)
+marketingdata$marital=as.numeric(marketingdata$marital)
+marketingdata$education=as.numeric(marketingdata$education)
+marketingdata$default=as.numeric(marketingdata$default)
+marketingdata$housing=as.numeric(marketingdata$housing)
+marketingdata$loan=as.numeric(marketingdata$loan)
+marketingdata$contact=as.numeric(marketingdata$contact)
+marketingdata$month=as.numeric(marketingdata$month)
+marketingdata$day_of_week=as.numeric(marketingdata$day_of_week)
+marketingdata$poutcome=as.numeric(marketingdata$poutcome)
+
+str(marketingdata)
+
+
+```
+
+
+# Correlation Plot
+```{r}
+library(corrplot)
+Numeric_cols=marketingdata[,-c(1,2,3,4,5,6,7,8,9,14,20)]
+factor_cols=marketingdata[,c(2,3,4,6,5,7,8,9,10,15,20)]
+corrplot(cor(Numeric_cols),method = "number")
+
+```
+
+#Split train and Test
+
+```{r}
+library(caret)
+
+set.seed(112)
+
+train_rows <- createDataPartition(marketingdata$y,p=0.7,list = F)
+
+train_data <- marketingdata[train_rows, ]
+
+
+test_data <- marketingdata[-train_rows, ]
+
+```
+
+# Preprocessing Data
+```{r}
+
+library(caret)
+
+preprocessmodel=preProcess(train_data[,!names(train_data) %in% c("y ")],method=c("center","scale"))
+train_data[,!names(train_data)%in% c("y ")]=predict(object = preprocessmodel,newdata=train_data[,!names(train_data) %in% c("y ")])
+test_data[,!names(train_data)%in% c("y ")]=predict(object = preprocessmodel,newdata=test_data[,!names(train_data) %in% c("y ")])
+
+
+table(marketingdata$y)
+```
+
+
+#Class Imbalance is there Smoting the Data 
+```{r}
+smoter_dataa <- SMOTE(y~., train_data, perc.over = 300,k=3,perc.under=300,learner = NULL)
+table(smoter_dataa$y)
+```
+
+
+
+
+#PCA of Data
+```{r}
+pca <- prcomp(train_data[, !(names(train_data) %in% c("y"))])
+train_datanew<-predict(pca,train_data)
+train_datanew<-data.frame(train_data)
+
+plot(pca, type = "l")
+summary(pca)
+train_datared<-data.frame(subset(train_datanew,select=c(job:poutcome)))
+test_datared<-data.frame(subset(test_data,select=c(job:poutcome)))
+str(train_datared)
+
+```
+
+
+#Merge Data and Target(y)
+```{r}
+
+y<-train_data$y
+train_datanew1<-as.data.frame(cbind(train_datared,y))
+y<-test_data$y
+
+test_datanew1<-cbind(test_datared,y)
+
+str(test_datanew1)
+
+
+```
+
