@@ -252,6 +252,8 @@ svmmodel=svm(y~ .,smoter_dataa,kernel="linear",cost=0.01,gamma=1)
 summary(svmmodel)
 pred.svm=predict(svmmodel,test_data)
 confusionMatrix(pred.svm,test_data$y,positive = "1")
+pred.svm=predict(svmmodel,train_data)
+confusionMatrix(pred.svm,train_data$y,positive = "1")
 pred.train.svm=predict(svmmodel)
 ```
 
@@ -262,6 +264,8 @@ svmmodel.th=ksvm(y~ .,smoter_dataa,kernel="tanhdot",cost=0.01,gamma=1)
 summary(svmmodel.th)
 pred.svm.th=predict(svmmodel.th,test_data)
 confusionMatrix(pred.svm.th,test_data$y,positive = "1")
+pred.svm.th=predict(svmmodel.th,train_data)
+confusionMatrix(pred.svm.th,train_data$y,positive = "1")
 pred.train.svm.th=predict(svmmodel.th)
 ```
 
@@ -273,6 +277,8 @@ svmmodel.rbk=lssvm(y~.,smoter_dataa,kernel="rbfdot",cost=0.01,gamma=1)
 summary(svmmodel.rbk)
 pred.svm.rbk=predict(svmmodel.rbk,test_data)
 confusionMatrix(pred.svm.rbk,test_data$y,positive = "1")
+pred.svm.rbk=predict(svmmodel.rbk,train_data)
+confusionMatrix(pred.svm.rbk,train_data$y,positive = "1")
 pred.train.svm.rbk=predict(svmmodel.rbk)
 ```
 
@@ -283,6 +289,8 @@ library(randomForest)
 model.rf=randomForest(y~ .,smoter_dataa,mtry=10,ntree=200)
 importance(model.rf)
 varImpPlot(model.rf)
+pred.rf=predict(model.rf,test_data)
+confusionMatrix(pred.rf,test_data$y,positive = "1")
 pred.rf=predict(model.rf,train_data)
 confusionMatrix(pred.rf,train_data$y,positive = "1")
 
@@ -293,10 +301,14 @@ confusionMatrix(pred.rf,train_data$y,positive = "1")
 #KNN model
 ```{r}
 
-model.knn=knn3(y~ .,train_data,k=1)
+model.knn=knn3(y~ .,train_data,k=10)
 pred.knn=predict(model.knn,test_data)
 preds_knn <- ifelse(pred.knn[, 1] > pred.knn[, 2], 0, 1)
 confusionMatrix(preds_knn,test_data$y,positive = "1")
+model.knn=knn3(y~ .,train_data,k=10)
+pred.knn1=predict(model.knn,train_data)
+preds_knn <- ifelse(pred.knn1[, 1] > pred.knn1[, 2], 0, 1)
+confusionMatrix(preds_knn,train_data$y,positive = "1")
 pred.train.knn <- predict(model.knn, train_data)
 
 
@@ -313,6 +325,11 @@ preds_dt <- predict(model_dt, test_data)
 preds_tree <- ifelse(preds_dt[, 1] > preds_dt[, 2], 0, 1)
 
 confusionMatrix(preds_tree, test_data$y,positive = "1")
+preds_dt <- predict(model_dt, train_data)
+
+preds_tree <- ifelse(preds_dt[, 1] > preds_dt[, 2], 0, 1)
+
+confusionMatrix(preds_tree, train_data$y,positive = "1")
 preds_train_dt <- predict(model_dt)
 
 preds_train_tree <- ifelse(preds_train_dt[, 1] > preds_train_dt[, 2], 0, 1)
@@ -330,6 +347,9 @@ model_tree_bag <- bagging(y ~ . , data=smoter_dataa, control = rpart.control(cp 
 preds_tree_bag <- predict(model_tree_bag, test_data)
 
 confusionMatrix(preds_tree_bag, test_data$y,positive = "1")
+preds_tree_bag <- predict(model_tree_bag, train_data)
+
+confusionMatrix(preds_tree_bag, train_data$y,positive = "1")
 preds_train_tree_bag <- predict(model_tree_bag)
 
 ```
@@ -352,6 +372,7 @@ summary(c5_rules)
 
 ```{r}
 preds <- predict(c5_tree, test_data)
+preds1 <- predict(c5_tree, train_data)
 
 ```
 
@@ -359,6 +380,7 @@ preds <- predict(c5_tree, test_data)
 library(caret)
 
 confusionMatrix(preds, test_data$y,positive = "1")
+confusionMatrix(preds1, train_data$y,positive = "1")
 
 
 ```
@@ -389,10 +411,16 @@ cutoff_gbm <- coords(gbm_roc, "best", ret = "threshold")
 preds_train_gbm <- ifelse(preds_g >= cutoff_gbm, 1, 0)
 #test_data$y=ifelse(test_data$y==1,0,1)
 preds_test_g <- predict(model_gbm1, test_data, type = 'response')
+preds_test_g1 <- predict(model_gbm1, train_data, type = 'response')
 preds_gbm <- ifelse(preds_test_g >= cutoff_gbm, 1, 0)
+preds_gbm1 <- ifelse(preds_test_g1 >= cutoff_gbm, 1, 0)
 preds_gbm =(preds_gbm)
+
+preds_gbm1 =(preds_gbm1)
 as.data.frame(preds_test_g)
+as.data.frame(preds_test_g1)
 confusionMatrix(preds_gbm,test_data$y,positive = "1")
+confusionMatrix(preds_gbm1,train_data$y,positive = "1")
 
 train_data$y <- as.factor(train_data$y)
 
@@ -426,7 +454,6 @@ train_datanew<-predict(pca,train_data)
 train_datanew<-data.frame(train_data)
 
 plot(pca)
-biplot(pca)
 summary(pca)
 train_datared<-data.frame(subset(train_datanew,select=c(job:poutcome)))
 test_datared<-data.frame(subset(test_data,select=c(job:poutcome)))
@@ -445,7 +472,7 @@ y<-test_data$y
 test_datanew1<-cbind(test_datared,y)
 
 str(test_datanew1)
-
+str(train_datanew1)
 
 ```
 
@@ -501,10 +528,15 @@ print(auc1)
 prob_test1 <- predict(log_reg1, test_datanew1, type = "response")
 
 preds_test1 <- ifelse(prob_test1 > 0.3, 1, 0)
+
+prob_train1 <- predict(log_reg1, train_datanew1, type = "response")
+
+preds_train1 <- ifelse(prob_train1 > 0.3, 1, 0)
 ```
 
 ```{r}
 confusionMatrix(test_datanew1$y,preds_test1,positive = "1")
+confusionMatrix(train_datanew1$y,preds_train1,positive = "1")
 
 
 ```
@@ -531,11 +563,14 @@ varImpPlot(model.rf)
 pred.rf1=predict(model.rf,test_datanew1)
 
 confusionMatrix(pred.rf1,test_datanew1$y,positive = "1")
+pred.rf1=predict(model.rf,train_datanew1)
+
+confusionMatrix(pred.rf1,train_datanew1$y,positive = "1")
 
 
 
 
-model.rf$emp.var.rate=NULL
+
 
 
 ```
@@ -549,38 +584,47 @@ svmmodel=svm(y~ .,smoter_data,kernel="linear",cost=0.01,gamma=1)
 summary(svmmodel)
 pred.svm=predict(svmmodel,test_datanew1)
 confusionMatrix(pred.svm,test_datanew1$y,positive = "1")
+pred.svm=predict(svmmodel,train_datanew1)
+confusionMatrix(pred.svm,train_datanew1$y,positive = "1")
 pred.train.svm=predict(svmmodel)
+
 ```
 
 #SVM nonlinear model with pca
 
 ```{r}
 library(kernlab)
-svmmodel.th=ksvm(y~ .,smoter_dataa,kernel="tanhdot",cost=0.01,gamma=1)
+svmmodel.th=ksvm(y~ .,smoter_data,kernel="tanhdot",cost=0.01,gamma=1)
 summary(svmmodel.th)
 pred.svm.th=predict(svmmodel.th,test_datanew1)
 confusionMatrix(pred.svm.th,test_datanew1$y,positive = "1")
+pred.svm.th=predict(svmmodel.th,train_datanew1)
+confusionMatrix(pred.svm.th,train_datanew1$y,positive = "1")
 pred.train.svm.th=predict(svmmodel.th)
 ```
 
 
 #SVM nonlinear model with pca
 ```{r}
-svmmodel.rbk=lssvm(y~.,smoter_dataa,kernel="rbfdot",cost=0.01,gamma=1)
+svmmodel.rbk=lssvm(y~.,smoter_data,kernel="rbfdot",cost=0.01,gamma=1)
 summary(svmmodel.rbk)
 pred.svm.rbk=predict(svmmodel.rbk,test_datanew1)
 confusionMatrix(pred.svm.rbk,test_datanew1$y,positive = "1")
+pred.svm.rbk=predict(svmmodel.rbk,train_datanew1)
+confusionMatrix(pred.svm.rbk,train_datanew1$y,positive = "1")
 pred.train.svm.rbk=predict(svmmodel.rbk)
 ```
 
 #Random forest using smotedata with pca
 ```{r}
 library(randomForest)
-model.rf=randomForest(y~ .,smoter_dataa,mtry=10,ntree=1500)
+model.rf=randomForest(y~ .,smoter_data,mtry=10,ntree=1500)
 importance(model.rf)
 varImpPlot(model.rf)
 pred.rf=predict(model.rf,test_datanew1)
 confusionMatrix(pred.rf,test_datanew1$y,positive = "1")
+pred.rf=predict(model.rf,train_datanew1)
+confusionMatrix(pred.rf,train_datanew1$y,positive = "1")
 
 
 
@@ -590,12 +634,16 @@ confusionMatrix(pred.rf,test_datanew1$y,positive = "1")
 
 #KNN model with pca
 ```{r}
-model.knn=knn3(y~ .,train_datanew1,k=1)
+model.knn=knn3(y~ .,train_datanew1,k=10)
 pred.knn=predict(model.knn,test_datanew1)
-
+pred.knn1=predict(model.knn,train_datanew1)
 preds_knn <- ifelse(pred.knn[, 1] > pred.knn[, 2], 0, 1)
 confusionMatrix(preds_knn,test_datanew1$y,positive = "1")
+preds_knn1 <- ifelse(pred.knn1[, 1] > pred.knn1[, 2], 0, 1)
+confusionMatrix(preds_knn1,train_datanew1$y,positive = "1")
 pred.train.knn <- predict(model.knn, train_datanew1)
+
+
 
 ```
 
@@ -604,12 +652,17 @@ pred.train.knn <- predict(model.knn, train_datanew1)
 ```{r}
 library(rpart)
 
-model_dt <- rpart(y ~ . ,smoter_dataa)
+model_dt <- rpart(y ~ . ,smoter_data)
 preds_dt <- predict(model_dt, test_datanew1)
 
 preds_tree <- ifelse(preds_dt[, 1] > preds_dt[, 2], 0, 1)
 
 confusionMatrix(preds_tree, test_datanew1$y,positive = "1")
+preds_dt <- predict(model_dt, train_datanew1)
+
+preds_tree <- ifelse(preds_dt[, 1] > preds_dt[, 2], 0, 1)
+
+confusionMatrix(preds_tree, train_datanew1$y,positive = "1")
 preds_train_dt <- predict(model_dt)
 
 preds_train_tree <- ifelse(preds_train_dt[, 1] > preds_train_dt[, 2], 0, 1)
@@ -622,13 +675,17 @@ preds_train_tree <- ifelse(preds_train_dt[, 1] > preds_train_dt[, 2], 0, 1)
 library(ipred)
 
 set.seed(123)
-model_tree_bag <- bagging(y ~ . , data=smoter_dataa, control = rpart.control(cp = 0.01, xval = 10))
+model_tree_bag <- bagging(y ~ . , data=smoter_data, control = rpart.control(cp = 0.01, xval = 10))
 
 preds_tree_bag <- predict(model_tree_bag, test_datanew1)
 
 confusionMatrix(preds_tree_bag, test_datanew1$y,positive = "1")
+preds_tree_bag <- predict(model_tree_bag, train_datanew1)
+
+confusionMatrix(preds_tree_bag, train_datanew1$y,positive = "1")
+
 preds_train_tree_bag <- predict(model_tree_bag)
-str(train_datanew1$y)
+
 ```
 
 
@@ -636,12 +693,12 @@ str(train_datanew1$y)
 ```{r}
 library(C50)
 
-c5_tree <- C5.0(y~ . , smoter_dataa,tuneGrid = c50Grid,
+c5_tree <- C5.0(y~ . , smoter_data,tuneGrid = c50Grid,
                    trControl = ctrl)
 
 # Use the rules = T argument if you want to extract rules later from the model
 
-c5_rules <- C5.0(y~.,smoter_dataa,rules = T)
+c5_rules <- C5.0(y~.,smoter_data,rules = T)
 C5imp(c5_tree, metric = "splits")
 summary(c5_rules)
 ```
@@ -649,12 +706,16 @@ summary(c5_rules)
 
 ```{r}
 preds <- predict(c5_tree, test_datanew1)
+preds1 <- predict(c5_tree, train_datanew1)
+
+
 ```
 
 ```{r}
 library(caret)
 
 confusionMatrix(preds, test_datanew1$y,positive = "1")
+confusionMatrix(preds1, train_datanew1$y,positive = "1")
 
 ```
 
@@ -685,11 +746,17 @@ gbm_roc <- roc(train_datanew1$y, preds_g,trControl = fitControl,verbose = FALSE)
 cutoff_gbm <- coords(gbm_roc, "best", ret = "threshold")
 preds_train_gbm <- ifelse(preds_g >= cutoff_gbm, 0, 1)
 
+
 preds_test_g <- predict(model_gbm, test_datanew1, type = 'response')
+preds_test_g1 <- predict(model_gbm, train_datanew1, type = 'response')
 preds_gbm <- ifelse(preds_test_g >= cutoff_gbm, 0, 1)
+preds_gbm1 <- ifelse(preds_test_g1 >= cutoff_gbm, 1, 0)
 preds_gbm =as.factor(preds_gbm)
+preds_gbm1 =as.factor(preds_gbm1)
 as.data.frame(preds_test_g)
+as.data.frame(preds_test_g1)
 confusionMatrix(preds_gbm,test_datanew1$y,positive = "1")
+confusionMatrix(preds_gbm1,train_datanew1$y,positive = "1")
 
 ```
 
