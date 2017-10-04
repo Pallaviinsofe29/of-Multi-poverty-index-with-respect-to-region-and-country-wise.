@@ -1,0 +1,708 @@
+---
+title: "models"
+author: "pallavi"
+date: "4 October 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+#load all libraries
+```{r}
+library(caret)
+library(ggplot2)
+library(DMwR)
+library(dummies)
+library(ggplot2)
+library(corrplot)
+library(MASS)
+library(car)
+library(glmnet)
+library(doParallel)
+library(data.table)
+library(ROCR)
+require(e1071)
+library(randomForest)
+```
+
+#set directory and read the data
+
+```{r cars}
+rm(list = ls(all=TRUE))
+getwd()
+setwd( "C:/Users/Pallavi/Desktop/internship/bank marketing data")
+marketingdata=read.csv("bankdata.csv",sep=";",na.strings="unknown")
+
+
+```
+
+#check  for NA values
+```{r}
+sum(is.na(marketingdata))
+marketingdata$age=NULL
+marketingdata$default=NULL
+str(marketingdata)
+sum(is.na(marketingdata))
+
+```
+
+#central Imputation and NearZerovarience
+```{r}
+marketingdata<-centralImputation(marketingdata)
+sum(is.na(marketingdata))
+mean(is.na(marketingdata))
+colMeans(is.na(marketingdata)) > .20
+nzv <- nearZeroVar(marketingdata[,!names(marketingdata) %in% c("y")])
+
+```
+
+
+#Find Unique values
+```{r}
+library(pastecs)
+stat.desc(marketingdata)
+
+```
+
+#Target variable "y" is changed to 0 and 1
+```{r}
+levels(marketingdata$y)
+marketingdata$y<-as.character(marketingdata$y)
+marketingdata$y[marketingdata$y=="yes"]=1
+marketingdata$y[marketingdata$y=="no" ]=0
+marketingdata$y<-as.factor(marketingdata$y)
+```
+
+#Checking Summary ,Structure,head,tail and dimension
+```{r}
+str(marketingdata)
+summary(marketingdata)
+
+head(marketingdata)
+tail(marketingdata)
+dim(marketingdata)
+
+
+```
+
+
+#Factors are converted to Numerics except target variable
+```{r}
+marketingdata$job=as.numeric(marketingdata$job)
+marketingdata$marital=as.numeric(marketingdata$marital)
+marketingdata$education=as.numeric(marketingdata$education)
+marketingdata$housing=as.numeric(marketingdata$housing)
+marketingdata$loan=as.numeric(marketingdata$loan)
+marketingdata$contact=as.numeric(marketingdata$contact)
+marketingdata$month=as.numeric(marketingdata$month)
+marketingdata$day_of_week=as.numeric(marketingdata$day_of_week)
+marketingdata$poutcome=as.numeric(marketingdata$poutcome)
+
+str(marketingdata)
+
+
+```
+
+
+# Correlation Plot
+```{r}
+library(corrplot)
+Numeric_cols=marketingdata[,-c(1,2,3,4,5,6,7,8,13,19)]
+factor_cols=marketingdata[,c(1,2,3,4,5,6,7,8,13,19)]
+corrplot(cor(Numeric_cols),method = "number")
+
+```
+
+#Split train and Test
+
+```{r}
+library(caret)
+
+set.seed(112)
+
+train_rows <- createDataPartition(marketingdata$y,p=0.7,list = F)
+
+train_data <- marketingdata[train_rows, ]
+
+
+test_data <- marketingdata[-train_rows, ]
+
+```
+
+# Preprocessing Data
+```{r}
+
+library(caret)
+
+preprocessmodel=preProcess(train_data[,!names(train_data) %in% c("y ")],method=c("center","scale"))
+train_data[,!names(train_data)%in% c("y ")]=predict(object = preprocessmodel,newdata=train_data[,!names(train_data) %in% c("y ")])
+test_data[,!names(train_data)%in% c("y ")]=predict(object = preprocessmodel,newdata=test_data[,!names(train_data) %in% c("y ")])
+
+
+table(marketingdata$y)
+```
+
+
+#Class Imbalance is there Smoting the Data 
+```{r}
+smoter_dataa <- SMOTE(y~., train_data, perc.over = 300,k=3,perc.under=300,learner = NULL)
+table(smoter_dataa$y)
+```
+#logistic  model
+
+```{r}
+library(glmnet)
+
+log_reg <- glm(y~., data = smoter_dataa, family = binomial)
+
+```
+
+
+```{r}
+summary(log_reg)
+
+```
+
+
+```{r}
+prob_train <- predict(log_reg, type = "response")
+```
+
+```{r}
+library(ROCR)
+
+pred <- prediction(prob_train, smoter_dataa$y)
+```
+
+```{r}
+perf <- performance(pred, measure="tpr", x.measure="fpr")
+```
+
+```{r}
+plot(perf, col=rainbow(10), colorize=T, print.cutoffs.at=seq(0,1,0.1))
+
+```
+
+```{r}
+perf_auc <- performance(pred, measure="auc")
+
+auc <- perf_auc@y.values[[1]]
+
+print(auc)
+```
+
+```{r}
+prob_test <- predict(log_reg, test_data, type = "response")
+
+preds_test <- ifelse(prob_test >0.48, 1,0)
+prob_train <- predict(log_reg, train_data, type = "response")
+
+preds_train <- ifelse(prob_train >0.48, 1,0)
+
+```
+
+```{r}
+confusionMatrix(test_data$y,preds_test,positive = "1")
+confusionMatrix(train_data$y,preds_train,positive = "1")
+
+
+
+
+```
+
+
+#Random forest
+```{r}
+library(randomForest)
+
+model.rf=randomForest(y~ .,train_data,mtry=10,ntree=1500)
+print(model.rf)
+round(importance(model.rf))
+# Extract and store important variables obtained from the random forest model
+rf_Imp_Attr = data.frame(model.rf$importance)
+
+rf_Imp_Attr = data.frame(row.names(rf_Imp_Attr),rf_Imp_Attr[,1])
+
+colnames(rf_Imp_Attr) = c('Attributes', 'Importance')
+rf_Imp_Attr = rf_Imp_Attr[order(rf_Imp_Attr$Importance, decreasing = TRUE),]
+names(rf_Imp_Attr)
+varImpPlot(model.rf)
+pred.rf=predict(model.rf,test_data[,setdiff(names(test_data) ,"y")],type="response",norm.votes=TRUE)
+confusionMatrix(pred.rf,test_data$y,positive = "1")
+pred.rf=predict(model.rf,train_data[,setdiff(names(train_data) ,"y")],type="response",norm.votes=TRUE)
+confusionMatrix(pred.rf,train_data$y,positive = "1")
+
+```
+
+#svm linear model
+
+```{r}
+library(e1071)
+svmmodel=svm(y~ .,smoter_dataa,kernel="linear",cost=0.01,gamma=1)
+#obj <- tune.svm(y~.,data=smoter_dataa,kernel="linear",cost=2^(2:4),gamma=2^(-1:1))
+summary(svmmodel)
+pred.svm=predict(svmmodel,test_data)
+confusionMatrix(pred.svm,test_data$y,positive = "1")
+pred.train.svm=predict(svmmodel)
+```
+
+#svm nonlinear model
+```{r}
+library(kernlab)
+svmmodel.th=ksvm(y~ .,smoter_dataa,kernel="tanhdot",cost=0.01,gamma=1)
+summary(svmmodel.th)
+pred.svm.th=predict(svmmodel.th,test_data)
+confusionMatrix(pred.svm.th,test_data$y,positive = "1")
+pred.train.svm.th=predict(svmmodel.th)
+```
+
+#SVM nonlinear model
+
+```{r}
+
+svmmodel.rbk=lssvm(y~.,smoter_dataa,kernel="rbfdot",cost=0.01,gamma=1)
+summary(svmmodel.rbk)
+pred.svm.rbk=predict(svmmodel.rbk,test_data)
+confusionMatrix(pred.svm.rbk,test_data$y,positive = "1")
+pred.train.svm.rbk=predict(svmmodel.rbk)
+```
+
+#Randdom forest using smote data
+
+```{r}
+library(randomForest)
+model.rf=randomForest(y~ .,smoter_dataa,mtry=10,ntree=200)
+importance(model.rf)
+varImpPlot(model.rf)
+pred.rf=predict(model.rf,train_data)
+confusionMatrix(pred.rf,train_data$y,positive = "1")
+
+```
+
+
+
+#KNN model
+```{r}
+
+model.knn=knn3(y~ .,train_data,k=1)
+pred.knn=predict(model.knn,test_data)
+preds_knn <- ifelse(pred.knn[, 1] > pred.knn[, 2], 0, 1)
+confusionMatrix(preds_knn,test_data$y,positive = "1")
+pred.train.knn <- predict(model.knn, train_data)
+
+
+```
+
+#CART model
+
+```{r}
+library(rpart)
+
+model_dt <- rpart(y ~ . ,smoter_dataa)
+preds_dt <- predict(model_dt, test_data)
+
+preds_tree <- ifelse(preds_dt[, 1] > preds_dt[, 2], 0, 1)
+
+confusionMatrix(preds_tree, test_data$y,positive = "1")
+preds_train_dt <- predict(model_dt)
+
+preds_train_tree <- ifelse(preds_train_dt[, 1] > preds_train_dt[, 2], 0, 1)
+```
+
+#Bagging
+
+```{r}
+
+library(ipred)
+
+set.seed(123)
+model_tree_bag <- bagging(y ~ . , data=smoter_dataa, control = rpart.control(cp = 0.1, xval = 10))
+
+preds_tree_bag <- predict(model_tree_bag, test_data)
+
+confusionMatrix(preds_tree_bag, test_data$y,positive = "1")
+preds_train_tree_bag <- predict(model_tree_bag)
+
+```
+
+#C50 model
+
+```{r}
+library(C50)
+
+c5_tree <- C5.0(y~ . , smoter_dataa,tuneGrid = c50Grid,
+                   trControl = ctrl)
+
+# Use the rules = T argument if you want to extract rules later from the model
+
+c5_rules <- C5.0(y~.,smoter_dataa,rules = T)
+C5imp(c5_tree, metric = "splits")
+summary(c5_rules)
+```
+
+
+```{r}
+preds <- predict(c5_tree, test_data)
+
+```
+
+```{r}
+library(caret)
+
+confusionMatrix(preds, test_data$y,positive = "1")
+
+
+```
+
+#gbm model
+
+```{r}
+train_data$y <- as.numeric(train_data$y)
+test_data$y <- as.numeric(test_data$y)
+train_data$y=ifelse(train_data$y==1,0,1)
+
+test_data$y=ifelse(test_data$y==1,0,1)
+
+library(gbm)
+set.seed(121)
+model_gbm1 <-gbm(y~., cv.folds = 8, interaction.depth = 3,shrinkage =0.005,verbose=FALSE,distribution='bernoulli',data= train_data, n.trees = 1500,n.cores=1)
+summary(model_gbm1)
+gbm.perf(model_gbm1)
+preds_g <- predict(model_gbm1, type = 'response')
+
+#install.packages("pROC")
+library(pROC)
+#install.packages("caret")
+set.seed(111)
+library(caret)
+gbm_roc <- roc(train_data$y, preds_g,trControl = fitControl,verbose = FALSE)
+cutoff_gbm <- coords(gbm_roc, "best", ret = "threshold")
+preds_train_gbm <- ifelse(preds_g >= cutoff_gbm, 1, 0)
+#test_data$y=ifelse(test_data$y==1,0,1)
+preds_test_g <- predict(model_gbm1, test_data, type = 'response')
+preds_gbm <- ifelse(preds_test_g >= cutoff_gbm, 1, 0)
+preds_gbm =(preds_gbm)
+as.data.frame(preds_test_g)
+confusionMatrix(preds_gbm,test_data$y,positive = "1")
+
+train_data$y <- as.factor(train_data$y)
+
+#test_data$y <- as.factor(test_data$y)
+
+#train_data$y=ifelse(train_data$y==1,1,0)
+train_data$y <- as.factor(train_data$y)
+levels(train_data$y)
+
+```
+
+#knn crossvalidation
+
+```{r}
+library(caret)
+model <- train(y~.,data=train_data,method='knn',tuneGrid=expand.grid(.k=1:9),trControl=trainControl(method='repeatedcv',number=10,repeats=1))
+
+
+model
+plot(model)
+
+
+
+```
+
+#PCA
+
+```{r}
+pca <- prcomp(train_data[, !(names(train_data) %in% c("y"))])
+train_datanew<-predict(pca,train_data)
+train_datanew<-data.frame(train_data)
+
+plot(pca)
+biplot(pca)
+summary(pca)
+train_datared<-data.frame(subset(train_datanew,select=c(job:poutcome)))
+test_datared<-data.frame(subset(test_data,select=c(job:poutcome)))
+str(train_datared)
+
+
+```
+
+
+```{r}
+
+y<-train_data$y
+train_datanew1<-as.data.frame(cbind(train_datared,y))
+y<-test_data$y
+
+test_datanew1<-cbind(test_datared,y)
+
+str(test_datanew1)
+
+
+```
+
+#class imbalance is there smoting the data
+
+```{r}
+smoter_data <- SMOTE(y~., train_datanew1, perc.over = 300,k=3,perc.under=300,learner = NULL)
+table(smoter_data$y)
+```
+
+# logistic model with pca
+```{r}
+library(glmnet)
+
+log_reg1 <- glm(y~., data = smoter_data, family = binomial)
+
+```
+
+
+```{r}
+summary(log_reg1)
+```
+
+
+```{r}
+prob_train1 <- predict(log_reg1, type = "response")
+```
+
+```{r}
+library(ROCR)
+
+pred1<- prediction(prob_train1, smoter_data$y)
+```
+
+```{r}
+perf1 <- performance(pred1, measure="tpr", x.measure="fpr")
+```
+
+```{r}
+plot(perf1, col=rainbow(10), colorize=T, print.cutoffs.at=seq(0,1,0.1))
+
+```
+
+```{r}
+perf_auc1 <- performance(pred1, measure="auc")
+
+auc1 <- perf_auc1@y.values[[1]]
+
+print(auc1)
+```
+
+```{r}
+prob_test1 <- predict(log_reg1, test_datanew1, type = "response")
+
+preds_test1 <- ifelse(prob_test1 > 0.3, 1, 0)
+```
+
+```{r}
+confusionMatrix(test_datanew1$y,preds_test1,positive = "1")
+
+
+```
+
+
+
+```{r}
+#preprocessparams<-preProcess(marketingdata,method = c("center","scale","pca"))
+#print(preprocessparams)
+#transformed=predict(preprocessparams,marketingdata)
+#summary(transformed)
+```
+
+
+#Random forest with pca
+
+
+```{r}
+
+library(randomForest)
+model.rf=randomForest(y~ .,train_datanew1,mtry=10,ntree=200)
+importance(model.rf)
+varImpPlot(model.rf)
+pred.rf1=predict(model.rf,test_datanew1)
+
+confusionMatrix(pred.rf1,test_datanew1$y,positive = "1")
+
+
+
+
+model.rf$emp.var.rate=NULL
+
+
+```
+
+
+#SVM  linear model with pca
+```{r}
+library(e1071)
+svmmodel=svm(y~ .,smoter_data,kernel="linear",cost=0.01,gamma=1)
+#obj <- tune.svm(y~.,data=smoter_dataa,kernel="linear",cost=2^(2:4),gamma=2^(-1:1))
+summary(svmmodel)
+pred.svm=predict(svmmodel,test_datanew1)
+confusionMatrix(pred.svm,test_datanew1$y,positive = "1")
+pred.train.svm=predict(svmmodel)
+```
+
+#SVM nonlinear model with pca
+
+```{r}
+library(kernlab)
+svmmodel.th=ksvm(y~ .,smoter_dataa,kernel="tanhdot",cost=0.01,gamma=1)
+summary(svmmodel.th)
+pred.svm.th=predict(svmmodel.th,test_datanew1)
+confusionMatrix(pred.svm.th,test_datanew1$y,positive = "1")
+pred.train.svm.th=predict(svmmodel.th)
+```
+
+
+#SVM nonlinear model with pca
+```{r}
+svmmodel.rbk=lssvm(y~.,smoter_dataa,kernel="rbfdot",cost=0.01,gamma=1)
+summary(svmmodel.rbk)
+pred.svm.rbk=predict(svmmodel.rbk,test_datanew1)
+confusionMatrix(pred.svm.rbk,test_datanew1$y,positive = "1")
+pred.train.svm.rbk=predict(svmmodel.rbk)
+```
+
+#Random forest using smotedata with pca
+```{r}
+library(randomForest)
+model.rf=randomForest(y~ .,smoter_dataa,mtry=10,ntree=1500)
+importance(model.rf)
+varImpPlot(model.rf)
+pred.rf=predict(model.rf,test_datanew1)
+confusionMatrix(pred.rf,test_datanew1$y,positive = "1")
+
+
+
+```
+
+
+
+#KNN model with pca
+```{r}
+model.knn=knn3(y~ .,train_datanew1,k=1)
+pred.knn=predict(model.knn,test_datanew1)
+
+preds_knn <- ifelse(pred.knn[, 1] > pred.knn[, 2], 0, 1)
+confusionMatrix(preds_knn,test_datanew1$y,positive = "1")
+pred.train.knn <- predict(model.knn, train_datanew1)
+
+```
+
+#CART model with pca
+
+```{r}
+library(rpart)
+
+model_dt <- rpart(y ~ . ,smoter_dataa)
+preds_dt <- predict(model_dt, test_datanew1)
+
+preds_tree <- ifelse(preds_dt[, 1] > preds_dt[, 2], 0, 1)
+
+confusionMatrix(preds_tree, test_datanew1$y,positive = "1")
+preds_train_dt <- predict(model_dt)
+
+preds_train_tree <- ifelse(preds_train_dt[, 1] > preds_train_dt[, 2], 0, 1)
+```
+
+#bagging with pca
+
+```{r}
+
+library(ipred)
+
+set.seed(123)
+model_tree_bag <- bagging(y ~ . , data=smoter_dataa, control = rpart.control(cp = 0.01, xval = 10))
+
+preds_tree_bag <- predict(model_tree_bag, test_datanew1)
+
+confusionMatrix(preds_tree_bag, test_datanew1$y,positive = "1")
+preds_train_tree_bag <- predict(model_tree_bag)
+str(train_datanew1$y)
+```
+
+
+#C50 model with pca
+```{r}
+library(C50)
+
+c5_tree <- C5.0(y~ . , smoter_dataa,tuneGrid = c50Grid,
+                   trControl = ctrl)
+
+# Use the rules = T argument if you want to extract rules later from the model
+
+c5_rules <- C5.0(y~.,smoter_dataa,rules = T)
+C5imp(c5_tree, metric = "splits")
+summary(c5_rules)
+```
+
+
+```{r}
+preds <- predict(c5_tree, test_datanew1)
+```
+
+```{r}
+library(caret)
+
+confusionMatrix(preds, test_datanew1$y,positive = "1")
+
+```
+
+```{r}
+train_preds_df <- data.frame(svm = pred.train.svm,tree = preds_train_tree, tree_bag = preds_train_tree_bag,gbm = preds_train_gbm, class = smoter_dataa$y)
+```
+
+#gbm model with pca
+
+```{r}
+train_datanew1$y <- as.numeric(train_datanew1$y)
+
+test_datanew1$y <- as.numeric(test_datanew1$y)
+train_datanew1$y=ifelse(train_datanew1$y==1,0,1)
+test_datanew1$y=ifelse(test_datanew1$y==1,0,1)
+library(gbm)
+model_gbm <-gbm(y ~ . , cv.folds = 6, interaction.depth = 3,shrinkage =0.005,distribution='bernoulli',data= train_datanew1, n.trees = 1500)
+summary(model_gbm)
+gbm.perf(model_gbm)
+preds_g <- predict(model_gbm, type = 'response')
+#install.packages("pROC")
+
+library(pROC)
+#install.packages("caret")
+set.seed(111)
+library(caret)
+gbm_roc <- roc(train_datanew1$y, preds_g,trControl = fitControl,verbose = FALSE)
+cutoff_gbm <- coords(gbm_roc, "best", ret = "threshold")
+preds_train_gbm <- ifelse(preds_g >= cutoff_gbm, 0, 1)
+
+preds_test_g <- predict(model_gbm, test_datanew1, type = 'response')
+preds_gbm <- ifelse(preds_test_g >= cutoff_gbm, 0, 1)
+preds_gbm =as.factor(preds_gbm)
+as.data.frame(preds_test_g)
+confusionMatrix(preds_gbm,test_datanew1$y,positive = "1")
+
+```
+
+#knn crossvalidation with pca
+
+```{r}
+library(caret)
+model <- train(y~.,data=train_datanew1,method='knn',tuneGrid=expand.grid(.k=1:9),trControl=trainControl(method='repeatedcv',number=10,repeats=1))
+
+
+model
+plot(model)
+
+
+
+```
